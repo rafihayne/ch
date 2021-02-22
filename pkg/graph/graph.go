@@ -51,7 +51,7 @@ type Edge struct {
 
 type Node struct {
 	index    uint   // TODO do we need this?
-	Incoming []Edge //TODO not sure why we need incoming tbh : NB I think needed for bidirectional
+	Incoming []Edge //NB: needed for bidirectional search
 	Outgoing []Edge
 	Value    NodeValue
 }

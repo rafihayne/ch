@@ -10,7 +10,6 @@ import (
 // MIT lisenced
 
 const (
-	// earthRadiusMi = 3958 // radius of the earth in miles.
 	earthRaidusKm = 6371 // radius of the earth in kilometers.
 )
 
@@ -35,13 +34,15 @@ func Haversine(lhs, rhs graph.NodeValue) float64 {
 
 	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
 
-	// mi = c * earthRadiusMi
 	km := c * earthRaidusKm
-
 	// Convert to meters
 	return km * 1000
 }
 
 func Euclidean(lhs, rhs graph.NodeValue) float64 {
 	return math.Sqrt(math.Pow(lhs.X-rhs.X, 2) + math.Pow(lhs.Y-rhs.Y, 2))
+}
+
+func Zero(lhs, rhs graph.NodeValue) float64 {
+	return 0
 }
