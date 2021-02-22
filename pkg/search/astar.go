@@ -3,8 +3,14 @@ package search
 import (
 	"container/heap"
 	"errors"
+	"math"
 
 	"github.com/rafihayne/ch/pkg/graph"
+)
+
+const (
+	forward  = 1
+	backward = 2
 )
 
 // TODO can aStarPQElement and aStarVisitedElement be the same?
@@ -134,6 +140,143 @@ func aStarSearch(g *graph.Graph, startIdx uint, goalIdx uint, h func(graph.NodeV
 	return visited, numVisited
 }
 
+func extractBidirectionalAStarSolution(g *graph.Graph, startIdx uint, goalIdx uint, middleIdx uint, visitedForward map[uint]aStarVisitedElement, visitedBackward map[uint]aStarVisitedElement) (AStarResult, error) {
+	resultForward, err := extractAStarSolution(g, startIdx, middleIdx, visitedForward, 0)
+	if err != nil {
+		return AStarResult{}, err
+	}
+	resultBackward, err := extractAStarSolution(g, goalIdx, middleIdx, visitedBackward, 0)
+	if err != nil {
+		return AStarResult{}, err
+	}
+
+	if resultForward.Path[len(resultForward.Path)-1] != resultBackward.Path[len(resultBackward.Path)-1] {
+		return AStarResult{}, errors.New("Rafi doesn't know what went wrong yet")
+	}
+
+	path := resultForward.Path
+	// TODO this unnecessarily double reverses backwards. small optimization
+	path = append(path, reverse(resultBackward.Path)[1:]...)
+	return AStarResult{path, resultForward.PathLen + resultBackward.PathLen, 0}, nil
+}
+
+func biDirectionalaStarSearch(g *graph.Graph, startIdx uint, goalIdx uint, h func(graph.NodeValue, graph.NodeValue) float64) (map[uint]aStarVisitedElement, map[uint]aStarVisitedElement, uint) {
+	// References
+	// https://www.cs.princeton.edu/courses/archive/spr06/cos423/Handouts/EPP%20shortest%20path%20algorithms.pdf
+	// https://www.homepages.ucl.ac.uk/~ucahmto/math/2020/05/30/bidirectional-dijkstra.html
+
+	// TODO: Figure out how to use the heuristic function for bi-astar
+	// TODO: Compute visited count
+
+	s := g.Nodes[startIdx].Value
+	t := g.Nodes[goalIdx].Value
+
+	mu := math.MaxFloat64 // Best path seen so far
+
+	// Create priority queue
+	pqForward := aStarPriorityQueue{}
+	heap.Init(&pqForward)
+	pqBackward := aStarPriorityQueue{}
+	heap.Init(&pqBackward)
+
+	// Create visited map
+	visitedForward := make(map[uint]aStarVisitedElement)
+	visitedBackward := make(map[uint]aStarVisitedElement)
+
+	heap.Push(&pqForward, &aStarPQElement{startIdx, startIdx, 0.0, h(s, t), 0})
+	heap.Push(&pqBackward, &aStarPQElement{goalIdx, goalIdx, 0.0, h(t, s), 0})
+
+	direction := forward
+	var meetingIdx uint
+
+	for pqForward.Len() > 0 && pqBackward.Len() > 0 {
+		// Peak on heaps to determine direction
+		var best *aStarPQElement
+		topForward := pqForward[0]
+		topBackward := pqBackward[0]
+
+		if topForward.costToCome < topBackward.costToCome {
+			best = heap.Pop(&pqForward).(*aStarPQElement)
+			direction = forward
+		} else {
+			best = heap.Pop(&pqBackward).(*aStarPQElement)
+			direction = backward
+		}
+
+		var seen aStarVisitedElement
+		found := false
+
+		seenForward, foundForward := visitedForward[best.currIdx]
+		seenBackward, foundBackward := visitedBackward[best.currIdx]
+		if direction == forward {
+			seen, found = seenForward, foundForward
+		} else {
+			seen, found = seenBackward, foundBackward
+		}
+
+		// Terminate if we've seen this node from both directions, and it's suboptimal vs the previous best
+		if (foundForward && foundBackward) && topForward.costToCome+topBackward.costToCome >= mu {
+			break
+		}
+
+		better := false
+		if found && best.costToCome < seen.costToCome {
+			better = true
+		}
+		if !found || better {
+			if direction == forward {
+				visitedForward[best.currIdx] = aStarVisitedElement{best.prevIdx, best.costToCome}
+			} else {
+				visitedBackward[best.currIdx] = aStarVisitedElement{best.prevIdx, best.costToCome}
+			}
+
+			parent := g.Nodes[best.currIdx]
+			if direction == forward {
+				for _, edge := range parent.Outgoing {
+					childCostToCome := best.costToCome + edge.Weight
+					child, childFound := visitedForward[edge.To]
+					childBetter := false
+					if childFound && childCostToCome < child.costToCome {
+						childBetter = true
+					}
+
+					if !childFound || childBetter {
+						heap.Push(&pqForward, &aStarPQElement{edge.To, best.currIdx, childCostToCome, h(g.Nodes[edge.To].Value, t), 0})
+						if bestBackward, ok := visitedBackward[edge.To]; ok {
+							dist := childCostToCome + bestBackward.costToCome
+							if dist < mu {
+								mu = dist
+								meetingIdx = edge.To
+							}
+						}
+					}
+				}
+			} else {
+				for _, edge := range parent.Incoming {
+					childCostToCome := best.costToCome + edge.Weight
+					child, childFound := visitedBackward[edge.To]
+					childBetter := false
+					if childFound && childCostToCome < child.costToCome {
+						childBetter = true
+					}
+
+					if !childFound || childBetter {
+						heap.Push(&pqBackward, &aStarPQElement{edge.To, best.currIdx, childCostToCome, h(t, g.Nodes[edge.To].Value), 0})
+						if bestForward, ok := visitedForward[edge.To]; ok {
+							dist := childCostToCome + bestForward.costToCome
+							if dist < mu {
+								mu = dist
+								meetingIdx = edge.To
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return visitedForward, visitedBackward, meetingIdx
+}
+
 func AStar(g *graph.Graph, startIdx uint, goalIdx uint, h func(graph.NodeValue, graph.NodeValue) float64) (AStarResult, error) {
 	// TODO maybe it's best just to stick to golang form and use ints rather than casting everywhere
 	if startIdx > uint(len(g.Nodes)) || goalIdx > uint(len(g.Nodes)) {
@@ -142,4 +285,14 @@ func AStar(g *graph.Graph, startIdx uint, goalIdx uint, h func(graph.NodeValue, 
 
 	visited, numVisited := aStarSearch(g, startIdx, goalIdx, h)
 	return extractAStarSolution(g, startIdx, goalIdx, visited, numVisited)
+}
+
+func BiDirectionalAStar(g *graph.Graph, startIdx uint, goalIdx uint, h func(graph.NodeValue, graph.NodeValue) float64) (AStarResult, error) {
+	// TODO maybe it's best just to stick to golang form and use ints rather than casting everywhere
+	if startIdx > uint(len(g.Nodes)) || goalIdx > uint(len(g.Nodes)) {
+		return AStarResult{}, errors.New("Index out of bounds")
+	}
+
+	visitedForward, visitedBackward, meetingIdx := biDirectionalaStarSearch(g, startIdx, goalIdx, h)
+	return extractBidirectionalAStarSolution(g, startIdx, goalIdx, meetingIdx, visitedForward, visitedBackward)
 }
