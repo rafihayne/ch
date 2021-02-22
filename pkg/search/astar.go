@@ -75,6 +75,7 @@ func extractAStarSolution(g *graph.Graph, startIdx uint, goalIdx uint, visited m
 	path := []uint{goalIdx}
 	prev, ok := visited[goalIdx]
 	if !ok {
+		fmt.Println(goalIdx)
 		return AStarResult{}, errors.New("No solution found")
 	}
 	pathlen := prev.costToCome
@@ -202,10 +203,23 @@ func biDirectionalaStarSearch(g *graph.Graph, startIdx uint, goalIdx uint, h fun
 
 		var seen aStarVisitedElement
 		found := false
+		// if direction == forward {
+		// 	seen, found = visitedForward[best.currIdx]
+		// } else {
+		// 	seen, found = visitedBackward[best.currIdx]
+		// }
+
+		seenForward, foundForward := visitedForward[best.currIdx]
+		seenBackward, foundBackward := visitedBackward[best.currIdx]
 		if direction == forward {
-			seen, found = visitedForward[best.currIdx]
+			seen, found = seenForward, foundForward
 		} else {
-			seen, found = visitedBackward[best.currIdx]
+			seen, found = seenBackward, foundBackward
+		}
+
+		if (foundForward && foundBackward) && topForward.costToCome+topBackward.costToCome >= mu {
+			meetingIdx = best.currIdx
+			break
 		}
 
 		better := false
@@ -271,34 +285,35 @@ func biDirectionalaStarSearch(g *graph.Graph, startIdx uint, goalIdx uint, h fun
 					}
 				}
 			}
-			if topForward.costToCome+topBackward.costToCome > mu {
-				// need to visit the top if we're on the opposite dir?
-				// if direction == forward {
-				// 	visitedBackward[topBackward.currIdx] = aStarVisitedElement{topBackward.prevIdx, topBackward.costToCome}
-				// } else {
-				// 	visitedForward[topForward.currIdx] = aStarVisitedElement{topForward.prevIdx, topForward.costToCome}
-				// }
-				// visitedBackward[topBackward.currIdx] = aStarVisitedElement{topBackward.prevIdx, topBackward.costToCome}
-				// visitedForward[topForward.currIdx] = aStarVisitedElement{topForward.prevIdx, topForward.costToCome}
-				meetingIdx = best.currIdx
+			// if topForward.costToCome+topBackward.costToCome > mu {
+			// 	// need to visit the top if we're on the opposite dir?
+			// 	// if direction == forward {
+			// 	// 	visitedBackward[topBackward.currIdx] = aStarVisitedElement{topBackward.prevIdx, topBackward.costToCome}
+			// 	// } else {
+			// 	// 	visitedForward[topForward.currIdx] = aStarVisitedElement{topForward.prevIdx, topForward.costToCome}
+			// 	// }
+			// 	// visitedBackward[topBackward.currIdx] = aStarVisitedElement{topBackward.prevIdx, topBackward.costToCome}
+			// 	// visitedForward[topForward.currIdx] = aStarVisitedElement{topForward.prevIdx, topForward.costToCome}
+			// 	meetingIdx = best.currIdx
 
-				// visitedForward
+			// 	// visitedForward
 
-				// fmt.Println(direction)
-				// fmt.Println(best.currIdx)
-				// resultForward, _ := extractAStarSolution(g, startIdx, best.currIdx, visitedForward, 0)
-				// resultBackward, _ := extractAStarSolution(g, goalIdx, best.currIdx, visitedBackward, 0)
+			// 	// fmt.Println(direction)
+			// 	// fmt.Println(best.currIdx)
+			// 	// resultForward, _ := extractAStarSolution(g, startIdx, best.currIdx, visitedForward, 0)
+			// 	// resultBackward, _ := extractAStarSolution(g, goalIdx, best.currIdx, visitedBackward, 0)
 
-				// fmt.Println(resultForward)
-				// fmt.Println(resultBackward)
+			// 	// fmt.Println(resultForward)
+			// 	// fmt.Println(resultBackward)
 
-				// fmt.Println(best.currIdx)
-				fmt.Println(topForward)
-				fmt.Println(topBackward)
-				// fmt.Println(visitedForward)
-				// fmt.Println(visitedBackward)
-				break
-			}
+			// 	// fmt.Println(best.currIdx)
+			// 	fmt.Println(topForward)
+			// 	fmt.Println(topBackward)
+			// 	fmt.Println(g.Nodes[int(topBackward.currIdx)].Incoming)
+			// 	// fmt.Println(visitedForward)
+			// 	// fmt.Println(visitedBackward)
+			// 	break
+			// }
 
 		}
 	}

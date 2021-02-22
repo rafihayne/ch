@@ -16,24 +16,23 @@ func main() {
 	// g := util.GenSimpleGraph(true)
 
 	start := time.Now()
-	result, err := search.BiDirectionalAStar(&g, samples[1][0], samples[1][1], func(lhs graph.NodeValue, rhs graph.NodeValue) float64 { return 0 })
+	result, err := search.BiDirectionalAStar(&g, samples[0][0], samples[0][1], func(lhs graph.NodeValue, rhs graph.NodeValue) float64 { return 0 })
 	// result, err := search.BiDirectionalAStar(&g, 0, 8, func(lhs graph.NodeValue, rhs graph.NodeValue) float64 { return 0 })
 	fmt.Println(err)
-	fmt.Println(result)
+	// fmt.Println(result)
 	// _ = result
 	fmt.Println("Finished in : ", time.Now().Sub(start))
 	fmt.Println(result.PathLen)
 	// fmt.Println(result)
 
-	// start := time.Now()
-	// for _, sample := range samples {
-	// 	result, _ := search.AStar(&g, sample[0], sample[1], util.Haversine)
-	// 	_ = result
-	// }
-	// fmt.Println("Finished ", len(samples), " queries in : ", time.Now().Sub(start))
+	start = time.Now()
+	result, _ = search.AStar(&g, samples[1][0], samples[1][1], util.Haversine)
+	fmt.Println(result.PathLen)
+	fmt.Println("Finished in : ", time.Now().Sub(start))
 
 	start = time.Now()
-	result2 := search.Dijkstras(&g, 0)
-	_ = result2
+	result2 := search.Dijkstras(&g, samples[1][0])
+	fmt.Println(result2[samples[1][1]])
+	// _ = result2
 	fmt.Println("Finished in : ", time.Now().Sub(start))
 }
