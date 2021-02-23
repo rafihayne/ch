@@ -55,7 +55,7 @@ func GraphFromFile(nodePath string, edgePath string) graph.Graph {
 		idx_one, _ := strconv.ParseInt(record[0], 10, 32)
 		idx_two, _ := strconv.ParseInt(record[1], 10, 32)
 		weight, _ := strconv.ParseFloat(record[2], 64)
-		// weight := search.Euclidean(g.Nodes[int(idx_one)].Value, g.Nodes[int(idx_two)].Value)
+		// weight := Euclidean(g.Nodes[int(idx_one)].Value, g.Nodes[int(idx_two)].Value)
 		g.AddEdge(uint(idx_one), uint(idx_two), weight)
 	}
 

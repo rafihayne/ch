@@ -28,6 +28,6 @@ func BiDirectionalDijkstras(g *graph.Graph, startIdx uint, goalIdx uint) (AStarR
 		return AStarResult{}, errors.New("Index out of bounds")
 	}
 
-	visitedForward, visitedBackward, meetingIdx := biDirectionalaStarSearch(g, startIdx, goalIdx, util.Zero)
-	return extractBidirectionalAStarSolution(g, startIdx, goalIdx, meetingIdx, visitedForward, visitedBackward)
+	visitedForward, visitedBackward, meetingIdx, numVisited := biDirectionalaStarSearch(g, startIdx, goalIdx, util.Zero)
+	return extractBidirectionalAStarSolution(g, startIdx, goalIdx, meetingIdx, visitedForward, visitedBackward, numVisited)
 }
