@@ -140,7 +140,7 @@ func aStarSearch(g *graph.Graph, startIdx uint, goalIdx uint, h func(graph.NodeV
 	return visited, numVisited
 }
 
-func extractBidirectionalAStarSolution(g *graph.Graph, startIdx uint, goalIdx uint, middleIdx uint, visitedForward map[uint]aStarVisitedElement, visitedBackward map[uint]aStarVisitedElement) (AStarResult, error) {
+func extractBidirectionalAStarSolution(g *graph.Graph, startIdx uint, goalIdx uint, middleIdx uint, visitedForward map[uint]aStarVisitedElement, visitedBackward map[uint]aStarVisitedElement, numVisited uint) (AStarResult, error) {
 	resultForward, err := extractAStarSolution(g, startIdx, middleIdx, visitedForward, 0)
 	if err != nil {
 		return AStarResult{}, err
@@ -157,10 +157,10 @@ func extractBidirectionalAStarSolution(g *graph.Graph, startIdx uint, goalIdx ui
 	path := resultForward.Path
 	// TODO this unnecessarily double reverses backwards. small optimization
 	path = append(path, reverse(resultBackward.Path)[1:]...)
-	return AStarResult{path, resultForward.PathLen + resultBackward.PathLen, 0}, nil
+	return AStarResult{path, resultForward.PathLen + resultBackward.PathLen, numVisited}, nil
 }
 
-func biDirectionalaStarSearch(g *graph.Graph, startIdx uint, goalIdx uint, h func(graph.NodeValue, graph.NodeValue) float64) (map[uint]aStarVisitedElement, map[uint]aStarVisitedElement, uint) {
+func biDirectionalaStarSearch(g *graph.Graph, startIdx uint, goalIdx uint, h func(graph.NodeValue, graph.NodeValue) float64) (map[uint]aStarVisitedElement, map[uint]aStarVisitedElement, uint, uint) {
 	// References
 	// https://www.cs.princeton.edu/courses/archive/spr06/cos423/Handouts/EPP%20shortest%20path%20algorithms.pdf
 	// https://www.homepages.ucl.ac.uk/~ucahmto/math/2020/05/30/bidirectional-dijkstra.html
@@ -171,7 +171,12 @@ func biDirectionalaStarSearch(g *graph.Graph, startIdx uint, goalIdx uint, h fun
 	s := g.Nodes[startIdx].Value
 	t := g.Nodes[goalIdx].Value
 
-	mu := math.MaxFloat64 // Best path seen so far
+	// make h(x) "consistent". might not be quite right
+	hPrime := func(source, value, target graph.NodeValue) float64 {
+		return (h(source, value) + h(value, target)) / 2.0
+	}
+
+	mu := math.Inf(1) // Best path seen so far
 
 	// Create priority queue
 	pqForward := aStarPriorityQueue{}
@@ -183,11 +188,12 @@ func biDirectionalaStarSearch(g *graph.Graph, startIdx uint, goalIdx uint, h fun
 	visitedForward := make(map[uint]aStarVisitedElement)
 	visitedBackward := make(map[uint]aStarVisitedElement)
 
-	heap.Push(&pqForward, &aStarPQElement{startIdx, startIdx, 0.0, h(s, t), 0})
-	heap.Push(&pqBackward, &aStarPQElement{goalIdx, goalIdx, 0.0, h(t, s), 0})
+	heap.Push(&pqForward, &aStarPQElement{startIdx, startIdx, 0.0, (h(s, t) + h(t, s)) / 2, 0})
+	heap.Push(&pqBackward, &aStarPQElement{goalIdx, goalIdx, 0.0, (h(t, s) + h(s, t)) / 2, 0})
 
 	direction := forward
 	var meetingIdx uint
+	numVisited := uint(0)
 
 	for pqForward.Len() > 0 && pqBackward.Len() > 0 {
 		// Peak on heaps to determine direction
@@ -202,6 +208,8 @@ func biDirectionalaStarSearch(g *graph.Graph, startIdx uint, goalIdx uint, h fun
 			best = heap.Pop(&pqBackward).(*aStarPQElement)
 			direction = backward
 		}
+
+		numVisited++
 
 		var seen aStarVisitedElement
 		found := false
@@ -241,7 +249,7 @@ func biDirectionalaStarSearch(g *graph.Graph, startIdx uint, goalIdx uint, h fun
 					}
 
 					if !childFound || childBetter {
-						heap.Push(&pqForward, &aStarPQElement{edge.To, best.currIdx, childCostToCome, h(g.Nodes[edge.To].Value, t), 0})
+						heap.Push(&pqForward, &aStarPQElement{edge.To, best.currIdx, childCostToCome, hPrime(s, g.Nodes[edge.To].Value, t), 0})
 						if bestBackward, ok := visitedBackward[edge.To]; ok {
 							dist := childCostToCome + bestBackward.costToCome
 							if dist < mu {
@@ -261,7 +269,7 @@ func biDirectionalaStarSearch(g *graph.Graph, startIdx uint, goalIdx uint, h fun
 					}
 
 					if !childFound || childBetter {
-						heap.Push(&pqBackward, &aStarPQElement{edge.To, best.currIdx, childCostToCome, h(t, g.Nodes[edge.To].Value), 0})
+						heap.Push(&pqBackward, &aStarPQElement{edge.To, best.currIdx, childCostToCome, hPrime(t, g.Nodes[edge.To].Value, s), 0})
 						if bestForward, ok := visitedForward[edge.To]; ok {
 							dist := childCostToCome + bestForward.costToCome
 							if dist < mu {
@@ -274,7 +282,7 @@ func biDirectionalaStarSearch(g *graph.Graph, startIdx uint, goalIdx uint, h fun
 			}
 		}
 	}
-	return visitedForward, visitedBackward, meetingIdx
+	return visitedForward, visitedBackward, meetingIdx, numVisited
 }
 
 func AStar(g *graph.Graph, startIdx uint, goalIdx uint, h func(graph.NodeValue, graph.NodeValue) float64) (AStarResult, error) {
@@ -293,6 +301,6 @@ func BiDirectionalAStar(g *graph.Graph, startIdx uint, goalIdx uint, h func(grap
 		return AStarResult{}, errors.New("Index out of bounds")
 	}
 
-	visitedForward, visitedBackward, meetingIdx := biDirectionalaStarSearch(g, startIdx, goalIdx, h)
-	return extractBidirectionalAStarSolution(g, startIdx, goalIdx, meetingIdx, visitedForward, visitedBackward)
+	visitedForward, visitedBackward, meetingIdx, numVisited := biDirectionalaStarSearch(g, startIdx, goalIdx, h)
+	return extractBidirectionalAStarSolution(g, startIdx, goalIdx, meetingIdx, visitedForward, visitedBackward, numVisited)
 }
